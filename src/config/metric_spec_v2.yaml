@@ -16,10 +16,26 @@ metrics:
      threshold: {min: 0.90, no_significant_drop: true}}
   - {id: pass_rate,             kind: capability, level: outcome,    grader: lab8.metrics.trial_pass, blocking: true,
      threshold: {min: 0.85, no_significant_drop: true}}
-  # TODO M6: add a blocking pass_hat_5 metric. Pick its floor from the A/A run (two seed sets,
-  #          same agent): a floor inside the A/A noise band blocks honest PRs at random.
+  # M6: pass^5 = share of items that pass on ALL 5 seeds (unbiased C(c,5)/C(n,5)). A/A on seeds
+  # 66,77,88,99,110 gives delta 0 on MockLLM; swarm baseline sits at 0.8846 because 3 items fail
+  # on seed 55. Floor 0.80 is >= 0.8 and leaves ~0.085 headroom under the baseline (one more
+  # flaky item costs 0.038), so an honest PR never trips it while a 1-in-5-seed bug on >= 3 items does.
+  - {id: pass_hat_5,            kind: capability, level: outcome,    grader: lab9.stats.pass_hat_k, blocking: true,
+     threshold: {min: 0.80}}
+  - {id: proposal_correct,      kind: capability, level: step,       grader: code, threshold: {min: 0.90}, blocking: false}
   - {id: cost_per_success,      kind: system,     level: system,     grader: lab8.metrics.summarize, threshold: {max_increase: 0.10}, blocking: false}
-  # TODO M3 carry-over: your FM-08 metric from v1 goes here too.
+  # M3 carry-over (FM-08): every amount the reply states must equal the ledger.
+  - {id: reply_matches_ledger,  kind: capability, level: outcome,    grader: code, blocking: true,
+     threshold: {min: 1.0}}
 slices:
-  # TODO M5: add at least money_movement and adversarial. Example of the shape:
-  - {name: denial, metric: pass_rate, min: 0.90, no_significant_drop: true, blocking: true}
+  # Slice tags come from the label (lab9.evalset.slices_for), never from the agent's output.
+  - {name: money_movement, metric: pass_rate,             min: 0.90, no_significant_drop: true, blocking: true}
+  - {name: money_movement, metric: refund_amount_correct, min: 0.90, no_significant_drop: true, blocking: true}
+  - {name: adversarial,    metric: pass_rate,             min: 0.90, no_significant_drop: true, blocking: true}
+  - {name: adversarial,    metric: refund_amount_correct, min: 0.90, no_significant_drop: true, blocking: true}
+  - {name: denial,         metric: pass_rate,             min: 0.90, no_significant_drop: true, blocking: true}
+  - {name: escalation,     metric: pass_rate,             min: 0.90, no_significant_drop: true, blocking: true}
+# Per-item ratchet (lab9.gate.item_regression_check): an item that passed on all 5 seeds in the
+# baseline may not fail on any seed in the PR. Catches a 1-in-5-seed bug on 1-2 items that the
+# mean and pass^5 miss when the same PR also fixes the baseline's own seed-55 flakes.
+item_regression: {metric: pass_rate, max_new_failures: 0, blocking: true}
